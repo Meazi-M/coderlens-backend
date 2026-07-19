@@ -1,0 +1,1212 @@
+[
+  {
+    "filePath": "job-tracker/src/App.css",
+    "fileName": "App.css",
+    "languageId": "css",
+    "activeSeconds": 5,
+    "linesAdded": 0,
+    "linesDeleted": 3,
+    "linesModified": 0,
+    "gitBranch": "feature/test-branchh",
+    "gitRepo": "local",
+    "projectFramework": "React",
+    "rawCodeChanges": [
+      {
+        "timeStamp": 1784329069010,
+        "type": "delete",
+        "content": "   jdnf     jndf     kksdfn",
+        "line": 184,
+        "amount": 2
+      },
+      {
+        "timeStamp": 1784329070101,
+        "type": "delete",
+        "content": " ",
+        "line": 184,
+        "amount": 0
+      },
+      {
+        "timeStamp": 1784329070408,
+        "type": "delete",
+        "content": " ",
+        "line": 183,
+        "amount": 1
+      }
+    ],
+    "timestamp": "2026-07-17T22:57:51.206Z"
+  },
+  {
+    "filePath": "job-tracker/src/App.css",
+    "fileName": "App.css",
+    "languageId": "css",
+    "activeSeconds": 7,
+    "linesAdded": 2,
+    "linesDeleted": 0,
+    "linesModified": 1,
+    "gitBranch": "feature/test-branchh",
+    "gitRepo": "local",
+    "projectFramework": "React",
+    "rawCodeChanges": [
+      {
+        "timeStamp": 1784329071649,
+        "type": "add",
+        "content": "     ",
+        "line": 183,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784329072036,
+        "type": "add",
+        "content": "n",
+        "line": 184,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784329072242,
+        "type": "add",
+        "content": "j",
+        "line": 184,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784329072311,
+        "type": "add",
+        "content": "s",
+        "line": 184,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784329072641,
+        "type": "add",
+        "content": "     ",
+        "line": 184,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784329072865,
+        "type": "add",
+        "content": "s",
+        "line": 185,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784329073080,
+        "type": "add",
+        "content": "b",
+        "line": 185,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784329073260,
+        "type": "add",
+        "content": "n",
+        "line": 185,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784329073417,
+        "type": "add",
+        "content": "x",
+        "line": 185,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784329074783,
+        "type": "modify",
+        "content": "s",
+        "line": 176,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784329075173,
+        "type": "modify",
+        "content": "s",
+        "line": 176,
+        "amount": 1
+      }
+    ],
+    "timestamp": "2026-07-17T22:58:21.339Z"
+  },
+  {
+    "filePath": "job-tracker/eslint.config.js",
+    "fileName": "eslint.config.js",
+    "languageId": "unknown",
+    "activeSeconds": 1,
+    "linesAdded": 0,
+    "linesDeleted": 0,
+    "linesModified": 0,
+    "gitBranch": "none",
+    "gitRepo": "local",
+    "projectFramework": "none",
+    "rawCodeChanges": [],
+    "timestamp": "2026-07-17T22:58:21.339Z"
+  },
+  {
+    "filePath": "job-tracker/src/config/constants.ts",
+    "fileName": "constants.ts",
+    "languageId": "unknown",
+    "activeSeconds": 1,
+    "linesAdded": 0,
+    "linesDeleted": 0,
+    "linesModified": 0,
+    "gitBranch": "none",
+    "gitRepo": "local",
+    "projectFramework": "none",
+    "rawCodeChanges": [],
+    "timestamp": "2026-07-17T22:58:21.339Z"
+  },
+  {
+    "filePath": "job-tracker/src/App.css",
+    "fileName": "App.css",
+    "languageId": "unknown",
+    "activeSeconds": 6,
+    "linesAdded": 0,
+    "linesDeleted": 0,
+    "linesModified": 0,
+    "gitBranch": "none",
+    "gitRepo": "local",
+    "projectFramework": "none",
+    "rawCodeChanges": [],
+    "timestamp": "2026-07-17T22:58:51.350Z"
+  },
+  {
+    "filePath": "job-tracker/src/App.css",
+    "fileName": "App.css",
+    "languageId": "css",
+    "activeSeconds": 1,
+    "linesAdded": 0,
+    "linesDeleted": 0,
+    "linesModified": 0,
+    "gitBranch": "none",
+    "gitRepo": "local",
+    "projectFramework": "none",
+    "rawCodeChanges": [],
+    "timestamp": "2026-07-17T22:59:21.363Z"
+  },
+  {
+    "filePath": "job-tracker/src/App.css",
+    "fileName": "App.css",
+    "languageId": "css",
+    "activeSeconds": 4,
+    "linesAdded": 0,
+    "linesDeleted": 0,
+    "linesModified": 0,
+    "gitBranch": "none",
+    "gitRepo": "local",
+    "projectFramework": "none",
+    "rawCodeChanges": [],
+    "timestamp": "2026-07-17T22:59:51.374Z"
+  },
+  {
+    "filePath": "job-tracker/eslint.config.js",
+    "fileName": "eslint.config.js",
+    "languageId": "css",
+    "activeSeconds": 1,
+    "linesAdded": 0,
+    "linesDeleted": 0,
+    "linesModified": 0,
+    "gitBranch": "none",
+    "gitRepo": "local",
+    "projectFramework": "none",
+    "rawCodeChanges": [],
+    "timestamp": "2026-07-17T22:59:51.374Z"
+  },
+  {
+    "filePath": "job-tracker/src/App.css",
+    "fileName": "App.css",
+    "languageId": "css",
+    "activeSeconds": 4,
+    "linesAdded": 0,
+    "linesDeleted": 0,
+    "linesModified": 0,
+    "gitBranch": "none",
+    "gitRepo": "local",
+    "projectFramework": "none",
+    "rawCodeChanges": [],
+    "timestamp": "2026-07-17T23:00:21.382Z"
+  },
+  {
+    "filePath": "job-tracker/src/App.css",
+    "fileName": "App.css",
+    "languageId": "css",
+    "activeSeconds": 30,
+    "linesAdded": 4,
+    "linesDeleted": 0,
+    "linesModified": 0,
+    "gitBranch": "feature/test-branchh",
+    "gitRepo": "local",
+    "projectFramework": "React",
+    "rawCodeChanges": [
+      {
+        "timeStamp": 1784329223574,
+        "type": "add",
+        "content": "     ",
+        "line": 185,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784329223806,
+        "type": "add",
+        "content": "d",
+        "line": 186,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784329223982,
+        "type": "add",
+        "content": "n",
+        "line": 186,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784329224097,
+        "type": "add",
+        "content": "s",
+        "line": 186,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784329224214,
+        "type": "add",
+        "content": "j",
+        "line": 186,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784329224437,
+        "type": "add",
+        "content": "n",
+        "line": 186,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784329224829,
+        "type": "add",
+        "content": "d",
+        "line": 186,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784329224979,
+        "type": "add",
+        "content": "s",
+        "line": 186,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784329225008,
+        "type": "add",
+        "content": "j",
+        "line": 186,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784329225309,
+        "type": "add",
+        "content": "f",
+        "line": 186,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784329225445,
+        "type": "add",
+        "content": "d",
+        "line": 186,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784329225760,
+        "type": "add",
+        "content": "a",
+        "line": 186,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784329225840,
+        "type": "add",
+        "content": "s",
+        "line": 186,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784329225946,
+        "type": "add",
+        "content": "j",
+        "line": 186,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784329226019,
+        "type": "add",
+        "content": "n",
+        "line": 186,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784329226131,
+        "type": "add",
+        "content": "s",
+        "line": 186,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784329226182,
+        "type": "add",
+        "content": "a",
+        "line": 186,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784329226235,
+        "type": "add",
+        "content": "     ",
+        "line": 186,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784329227256,
+        "type": "add",
+        "content": "j",
+        "line": 187,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784329227288,
+        "type": "add",
+        "content": "d",
+        "line": 187,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784329227404,
+        "type": "add",
+        "content": "s",
+        "line": 187,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784329227560,
+        "type": "add",
+        "content": "j",
+        "line": 187,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784329227800,
+        "type": "add",
+        "content": "b",
+        "line": 187,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784329227848,
+        "type": "add",
+        "content": "a",
+        "line": 187,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784329227895,
+        "type": "add",
+        "content": "s",
+        "line": 187,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784329227910,
+        "type": "add",
+        "content": "j",
+        "line": 187,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784329228004,
+        "type": "add",
+        "content": "n",
+        "line": 187,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784329228076,
+        "type": "add",
+        "content": "d",
+        "line": 187,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784329228130,
+        "type": "add",
+        "content": "k",
+        "line": 187,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784329228183,
+        "type": "add",
+        "content": "s",
+        "line": 187,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784329228196,
+        "type": "add",
+        "content": "n",
+        "line": 187,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784329228209,
+        "type": "add",
+        "content": "d",
+        "line": 187,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784329228356,
+        "type": "add",
+        "content": "s",
+        "line": 187,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784329228520,
+        "type": "add",
+        "content": "d",
+        "line": 187,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784329228774,
+        "type": "add",
+        "content": "     ",
+        "line": 187,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784329228844,
+        "type": "add",
+        "content": "n",
+        "line": 188,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784329228946,
+        "type": "add",
+        "content": "d",
+        "line": 188,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784329229361,
+        "type": "add",
+        "content": "b",
+        "line": 188,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784329229463,
+        "type": "add",
+        "content": "s",
+        "line": 188,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784329229523,
+        "type": "add",
+        "content": "j",
+        "line": 188,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784329229537,
+        "type": "add",
+        "content": "d",
+        "line": 188,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784329229547,
+        "type": "add",
+        "content": "n",
+        "line": 188,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784329229729,
+        "type": "add",
+        "content": "s",
+        "line": 188,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784329229878,
+        "type": "add",
+        "content": "k",
+        "line": 188,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784329229963,
+        "type": "add",
+        "content": "a",
+        "line": 188,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784329230024,
+        "type": "add",
+        "content": "d",
+        "line": 188,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784329230167,
+        "type": "add",
+        "content": "k",
+        "line": 188,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784329230271,
+        "type": "add",
+        "content": "s",
+        "line": 188,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784329230370,
+        "type": "add",
+        "content": "j",
+        "line": 188,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784329230380,
+        "type": "add",
+        "content": "d",
+        "line": 188,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784329230428,
+        "type": "add",
+        "content": "s",
+        "line": 188,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784329230730,
+        "type": "add",
+        "content": "     ",
+        "line": 188,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784329231035,
+        "type": "add",
+        "content": "n",
+        "line": 189,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784329231256,
+        "type": "add",
+        "content": "s",
+        "line": 189,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784329231422,
+        "type": "add",
+        "content": "d",
+        "line": 189,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784329231494,
+        "type": "add",
+        "content": "n",
+        "line": 189,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784329231739,
+        "type": "add",
+        "content": "s",
+        "line": 189,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784329231819,
+        "type": "add",
+        "content": "a",
+        "line": 189,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784329231831,
+        "type": "add",
+        "content": "k",
+        "line": 189,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784329231846,
+        "type": "add",
+        "content": "j",
+        "line": 189,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784329232165,
+        "type": "add",
+        "content": "o",
+        "line": 189,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784329232260,
+        "type": "add",
+        "content": "l",
+        "line": 189,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784329232396,
+        "type": "add",
+        "content": "k",
+        "line": 189,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784329232620,
+        "type": "add",
+        "content": "a",
+        "line": 189,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784329232653,
+        "type": "add",
+        "content": "k",
+        "line": 189,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784329232706,
+        "type": "add",
+        "content": "s",
+        "line": 189,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784329232723,
+        "type": "add",
+        "content": "n",
+        "line": 189,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784329232925,
+        "type": "add",
+        "content": "j",
+        "line": 189,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784329233082,
+        "type": "add",
+        "content": "d",
+        "line": 189,
+        "amount": 1
+      }
+    ],
+    "timestamp": "2026-07-17T23:00:51.393Z"
+  },
+  {
+    "filePath": "job-tracker/src/App.css",
+    "fileName": "App.css",
+    "languageId": "css",
+    "activeSeconds": 5,
+    "linesAdded": 0,
+    "linesDeleted": 3,
+    "linesModified": 0,
+    "gitBranch": "feature/test-branchh",
+    "gitRepo": "local",
+    "projectFramework": "React",
+    "rawCodeChanges": [
+      {
+        "timeStamp": 1784330080245,
+        "type": "delete",
+        "content": "    njs     sbnx     dnsjndsjfdasjnsa   ",
+        "line": 184,
+        "amount": 3
+      }
+    ],
+    "timestamp": "2026-07-17T23:14:40.324Z"
+  },
+  {
+    "filePath": "job-tracker/src/App.css",
+    "fileName": "App.css",
+    "languageId": "css",
+    "activeSeconds": 30,
+    "linesAdded": 5,
+    "linesDeleted": 0,
+    "linesModified": 0,
+    "gitBranch": "feature/test-branchh",
+    "gitRepo": "local",
+    "projectFramework": "React",
+    "rawCodeChanges": [
+      {
+        "timeStamp": 1784330081726,
+        "type": "add",
+        "content": "     ",
+        "line": 184,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784330082367,
+        "type": "add",
+        "content": "g",
+        "line": 185,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784330082541,
+        "type": "add",
+        "content": "y",
+        "line": 185,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784330082660,
+        "type": "add",
+        "content": "j",
+        "line": 185,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784330082835,
+        "type": "add",
+        "content": "h",
+        "line": 185,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784330082899,
+        "type": "add",
+        "content": "u",
+        "line": 185,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784330083035,
+        "type": "add",
+        "content": "     ",
+        "line": 185,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784330083246,
+        "type": "add",
+        "content": "g",
+        "line": 186,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784330083454,
+        "type": "add",
+        "content": "y",
+        "line": 186,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784330083747,
+        "type": "add",
+        "content": "j",
+        "line": 186,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784330083870,
+        "type": "add",
+        "content": "h",
+        "line": 186,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784330083983,
+        "type": "add",
+        "content": "h",
+        "line": 186,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784330084440,
+        "type": "add",
+        "content": "     ",
+        "line": 186,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784330084543,
+        "type": "add",
+        "content": "d",
+        "line": 187,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784330084656,
+        "type": "add",
+        "content": "s",
+        "line": 187,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784330084749,
+        "type": "add",
+        "content": "f",
+        "line": 187,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784330084864,
+        "type": "add",
+        "content": "d",
+        "line": 187,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784330084984,
+        "type": "add",
+        "content": "f",
+        "line": 187,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784330085944,
+        "type": "add",
+        "content": "     ",
+        "line": 187,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784330086679,
+        "type": "add",
+        "content": "n",
+        "line": 188,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784330086927,
+        "type": "add",
+        "content": "n",
+        "line": 188,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784330088319,
+        "type": "add",
+        "content": "d",
+        "line": 188,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784330089656,
+        "type": "add",
+        "content": "n",
+        "line": 188,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784330089834,
+        "type": "add",
+        "content": "n",
+        "line": 188,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784330093675,
+        "type": "add",
+        "content": "     ",
+        "line": 188,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784330094447,
+        "type": "add",
+        "content": "y",
+        "line": 189,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784330094756,
+        "type": "add",
+        "content": "u",
+        "line": 189,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784330094949,
+        "type": "add",
+        "content": "i",
+        "line": 189,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784330095028,
+        "type": "add",
+        "content": "k",
+        "line": 189,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784330095146,
+        "type": "add",
+        "content": "i",
+        "line": 189,
+        "amount": 1
+      }
+    ],
+    "timestamp": "2026-07-17T23:15:10.354Z"
+  },
+  {
+    "filePath": "job-tracker/src/App.css",
+    "fileName": "App.css",
+    "languageId": "css",
+    "activeSeconds": 30,
+    "linesAdded": 1,
+    "linesDeleted": 0,
+    "linesModified": 0,
+    "gitBranch": "feature/test-branchh",
+    "gitRepo": "local",
+    "projectFramework": "React",
+    "rawCodeChanges": [
+      {
+        "timeStamp": 1784330118563,
+        "type": "add",
+        "content": "     ",
+        "line": 189,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784330119094,
+        "type": "add",
+        "content": "j",
+        "line": 190,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784330119340,
+        "type": "add",
+        "content": "n",
+        "line": 190,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784330120294,
+        "type": "add",
+        "content": "k",
+        "line": 190,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784330120380,
+        "type": "add",
+        "content": "r",
+        "line": 190,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784330120751,
+        "type": "add",
+        "content": "g",
+        "line": 190,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784330120962,
+        "type": "add",
+        "content": "n",
+        "line": 190,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784330122121,
+        "type": "add",
+        "content": " ",
+        "line": 190,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784330123039,
+        "type": "add",
+        "content": "r",
+        "line": 190,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784330123607,
+        "type": "add",
+        "content": "s",
+        "line": 190,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784330123977,
+        "type": "add",
+        "content": "k",
+        "line": 190,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784330124154,
+        "type": "add",
+        "content": "f",
+        "line": 190,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784330124386,
+        "type": "add",
+        "content": "n",
+        "line": 190,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784330125046,
+        "type": "add",
+        "content": " ",
+        "line": 190,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784330125501,
+        "type": "add",
+        "content": "y",
+        "line": 190,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784330125772,
+        "type": "add",
+        "content": "o",
+        "line": 190,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784330126309,
+        "type": "add",
+        "content": "u",
+        "line": 190,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784330126548,
+        "type": "add",
+        "content": " ",
+        "line": 190,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784330126772,
+        "type": "add",
+        "content": "b",
+        "line": 190,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784330127030,
+        "type": "add",
+        "content": "r",
+        "line": 190,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784330127795,
+        "type": "delete",
+        "content": "r",
+        "line": 190,
+        "amount": 0
+      },
+      {
+        "timeStamp": 1784330128358,
+        "type": "add",
+        "content": "e",
+        "line": 190,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784330128579,
+        "type": "add",
+        "content": "t",
+        "line": 190,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784330128755,
+        "type": "add",
+        "content": "t",
+        "line": 190,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784330128963,
+        "type": "add",
+        "content": "e",
+        "line": 190,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784330129095,
+        "type": "add",
+        "content": "r",
+        "line": 190,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784330129494,
+        "type": "add",
+        "content": " ",
+        "line": 190,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784330130042,
+        "type": "add",
+        "content": "w",
+        "line": 190,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784330130313,
+        "type": "add",
+        "content": "a",
+        "line": 190,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784330130980,
+        "type": "add",
+        "content": "t",
+        "line": 190,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784330131263,
+        "type": "add",
+        "content": "c",
+        "line": 190,
+        "amount": 1
+      },
+      {
+        "timeStamp": 1784330131642,
+        "type": "add",
+        "content": "h",
+        "line": 190,
+        "amount": 1
+      }
+    ],
+    "timestamp": "2026-07-17T23:15:40.356Z"
+  }
+]
