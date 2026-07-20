@@ -1,76 +1,67 @@
-const express = require('express');
-const cors = require('cors');
-const fs = require('fs');
-const path = require('path');
 require('dotenv').config();
+const express    = require('express');
+const cors       = require('cors');
+const http       = require('http');
+const passport   = require('./src/config/passport');
+const { attachWebSocketServer } = require('./src/websocket/wsServer');
+
+const authRoutes        = require('./src/features/auth/auth.routes');
+const telemetryRoutes   = require('./src/features/telemetry/telemetry.routes');
+const connectionsRoutes = require('./src/features/connections/connections.routes');
+const projectsRoutes    = require('./src/features/projects/projects.routes');
+const reportsRoutes     = require('./src/features/reports/reports.routes');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
-const DB_PATH = path.join(__dirname, 'data', 'db.json');
+const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
 
-app.use(cors());
+app.use(cors({ origin: FRONTEND_URL, credentials: true }));
 app.use(express.json());
+app.use(passport.initialize());
 
-// Ensure the db.json file exists
-function ensureDbExists() {
-    const dir = path.dirname(DB_PATH);
-    if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
-    }
-    if (!fs.existsSync(DB_PATH)) {
-        fs.writeFileSync(DB_PATH, JSON.stringify([], null, 2));
-    }
-}
+// REST routes
+app.use('/api/auth',        authRoutes);
+app.use('/api/activity',    telemetryRoutes);   // extension posts here
+app.use('/api/telemetry',   telemetryRoutes);   // frontend reads here
+app.use('/api/connections', connectionsRoutes);
+app.use('/api/projects',    projectsRoutes);
+app.use('/api/reports',     reportsRoutes);
 
-// Read database records
-function getActivities() {
-    try {
-        ensureDbExists();
-        const data = fs.readFileSync(DB_PATH, 'utf-8');
-        return JSON.parse(data);
-    } catch (error) {
-        return [];
-    }
-}
-
-// Ingestion API Route matching our previous structure
-app.post('/api/activity', (req, res) => {
-    try {
-        const body = req.body;
-        const batchTimestamp = body.timestamp || new Date().toISOString();
-        const events = body.events || [];
-        
-        if (Array.isArray(events) && events.length > 0) {
-            ensureDbExists();
-            const currentRecords = getActivities();
-            
-            const formattedRecords = events.map(rec => ({
-                filePath: rec.filePath || '',
-                fileName: rec.fileName || '',
-                languageId: rec.languageId || rec.language || 'unknown',
-                activeSeconds: Number(rec.activeSeconds) || 0,
-                linesAdded: Number(rec.linesAdded) || 0,
-                linesDeleted: Number(rec.linesDeleted) || 0,
-                linesModified: Number(rec.linesModified) || 0,
-                gitBranch: rec.gitBranch || 'none',
-                gitRepo: rec.gitRepo || 'local',
-                projectFramework: rec.projectFramework || 'none',
-                rawCodeChanges: rec.rawCodeChanges || rec.changes || [],
-                timestamp: batchTimestamp
-            }));
-            
-            const updatedRecords = [...currentRecords, ...formattedRecords];
-            fs.writeFileSync(DB_PATH, JSON.stringify(updatedRecords, null, 2), 'utf-8');
-            console.log(`Successfully persisted ${formattedRecords.length} records to local DB.`);
-        }
-        
-        res.status(200).json({ status: 'success', message: 'Telemetry received and persisted' });
-    } catch (error) {
-        console.error('API Error:', error.message);
-        res.status(400).json({ status: 'error', message: 'Invalid JSON payload' });
-    }
+// Google OAuth
+app.get('/api/auth/google', (req, res, next) => {
+    passport.authenticate('google', {
+        scope: ['profile', 'email'],
+        state: req.query.role || 'developer',
+        session: false,
+    })(req, res, next);
 });
+app.get('/api/auth/google/callback',
+    passport.authenticate('google', { session: false, failureRedirect: `${FRONTEND_URL}/login?error=oauth` }),
+    (req, res) => res.redirect(`${FRONTEND_URL}/oauth-success?token=${req.user.token}`)
+);
 
-app.listen(PORT, () => {
-    console.log(`CoderLens Express API running at http://localhost:${PORT}`);
+// GitHub OAuth
+app.get('/api/auth/github', (req, res, next) => {
+    passport.authenticate('github', {
+        scope: ['user:email'],
+        state: req.query.role || 'developer',
+        session: false,
+    })(req, res, next);
+});
+app.get('/api/auth/github/callback',
+    passport.authenticate('github', { session: false, failureRedirect: `${FRONTEND_URL}/login?error=oauth` }),
+    (req, res) => res.redirect(`${FRONTEND_URL}/oauth-success?token=${req.user.token}`)
+);
+
+// Health check
+app.get('/health', (_req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
+
+// Start server + attach WebSocket
+const httpServer = http.createServer(app);
+attachWebSocketServer(httpServer);
+
+httpServer.listen(PORT, () => {
+    console.log(`\n🚀 CoderLens API  →  http://localhost:${PORT}`);
+    console.log(`🔌 WebSocket      →  ws://localhost:${PORT}/ws`);
+    console.log(`🌐 Frontend URL   →  ${FRONTEND_URL}\n`);
 });
