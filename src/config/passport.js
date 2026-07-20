@@ -32,7 +32,7 @@ function upsertOAuthUser({ provider, oauthId, email, name, avatarUrl, role }) {
     const { password: _, ...safeUser } = user;
     return { user: safeUser, token: signToken(safeUser) };
 }
-
+if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
 passport.use(new GoogleStrategy(
     {
         clientID:     process.env.GOOGLE_CLIENT_ID,
@@ -52,12 +52,17 @@ passport.use(new GoogleStrategy(
         }));
     }
 ));
-
-passport.use(new GitHubStrategy(
-    {
-        clientID:     process.env.GITHUB_CLIENT_ID,
-        clientSecret: process.env.GITHUB_CLIENT_SECRET,
-        callbackURL:  process.env.GITHUB_CALLBACK_URL,
+    console.log("✅ Google OAuth enabled");
+} else {
+    console.log("⚠️ Google OAuth disabled (missing credentials)");
+}
+if (process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET) {
+    console.log("✅ GitHub OAuth enabled");
+    passport.use(new GitHubStrategy(
+        {
+            clientID:     process.env.GITHUB_CLIENT_ID,
+            clientSecret: process.env.GITHUB_CLIENT_SECRET,
+            callbackURL:  process.env.GITHUB_CALLBACK_URL,
         scope: ['user:email'],
         passReqToCallback: true,
     },
@@ -73,6 +78,9 @@ passport.use(new GitHubStrategy(
         }));
     }
 ));
+} else {
+    console.log("⚠️ GitHub OAuth disabled (missing credentials)");
+}
 
 passport.serializeUser((data, done) => done(null, data));
 passport.deserializeUser((data, done) => done(null, data));

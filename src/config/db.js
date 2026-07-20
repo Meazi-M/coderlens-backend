@@ -69,3 +69,5 @@ db.exec(`
     CREATE INDEX IF NOT EXISTS idx_connections_recruiter ON connections(recruiter_id, status);
     CREATE INDEX IF NOT EXISTS idx_connections_developer ON connections(developer_id, status);
 `);
+
+module.exports = db;
