@@ -1,4 +1,5 @@
 const db = require('../../config/db');
+const { notifyConnectionUpdate, isDeveloperOnline } = require('../../websocket/wsServer');
 
 function sendRequest(req, res) {
     if (req.user.role !== 'recruiter')
@@ -27,7 +28,9 @@ function sendRequest(req, res) {
         'INSERT INTO connections (recruiter_id, developer_id) VALUES (?, ?)'
     ).run(req.user.id, developer.id);
 
-    return res.status(201).json({
+    try { notifyConnectionUpdate(req.user.id, developer.id); } catch (e) {}
+
+    return res.json({
         connection: db.prepare('SELECT * FROM connections WHERE id = ?').get(result.lastInsertRowid)
     });
 }
@@ -53,16 +56,15 @@ function respondToRequest(req, res) {
         "UPDATE connections SET status = ?, responded_at = datetime('now') WHERE id = ?"
     ).run(newStatus, conn.id);
 
+    try { notifyConnectionUpdate(conn.recruiter_id, conn.developer_id); } catch (e) {}
+
     return res.json({ status: newStatus });
 }
 
 function toggleConnection(req, res) {
-    if (req.user.role !== 'developer')
-        return res.status(403).json({ error: 'Only developers can toggle connections' });
-
     const conn = db.prepare(
-        'SELECT * FROM connections WHERE id = ? AND developer_id = ?'
-    ).get(req.params.id, req.user.id);
+        'SELECT * FROM connections WHERE id = ? AND (developer_id = ? OR recruiter_id = ?)'
+    ).get(req.params.id, req.user.id, req.user.id);
 
     if (!conn) return res.status(404).json({ error: 'Connection not found' });
     if (['terminated', 'pending'].includes(conn.status))
@@ -71,16 +73,15 @@ function toggleConnection(req, res) {
     const newStatus = req.body.active ? 'active' : 'paused';
     db.prepare('UPDATE connections SET status = ? WHERE id = ?').run(newStatus, conn.id);
 
+    try { notifyConnectionUpdate(conn.recruiter_id, conn.developer_id); } catch (e) {}
+
     return res.json({ status: newStatus });
 }
 
 function terminateConnection(req, res) {
-    if (req.user.role !== 'recruiter')
-        return res.status(403).json({ error: 'Only recruiters can terminate connections' });
-
     const conn = db.prepare(
-        'SELECT * FROM connections WHERE id = ? AND recruiter_id = ?'
-    ).get(req.params.id, req.user.id);
+        'SELECT * FROM connections WHERE id = ? AND (developer_id = ? OR recruiter_id = ?)'
+    ).get(req.params.id, req.user.id, req.user.id);
 
     if (!conn) return res.status(404).json({ error: 'Connection not found' });
     if (conn.status === 'terminated')
@@ -89,6 +90,8 @@ function terminateConnection(req, res) {
     db.prepare(
         "UPDATE connections SET status = 'terminated', terminated_at = datetime('now') WHERE id = ?"
     ).run(conn.id);
+
+    try { notifyConnectionUpdate(conn.recruiter_id, conn.developer_id); } catch (e) {}
 
     return res.json({ message: 'Connection permanently terminated' });
 }
@@ -102,25 +105,50 @@ function getMyTeam(req, res) {
                u.id AS developer_id, u.name, u.email, u.avatar_url, u.last_seen
         FROM connections c
         JOIN users u ON u.id = c.developer_id
-        WHERE c.recruiter_id = ?
+        WHERE c.recruiter_id = ? AND c.status IN ('active', 'paused')
         ORDER BY c.status ASC, u.name ASC
     `).all(req.user.id);
 
-    const today = new Date().toISOString().slice(0, 10);
+    const now = new Date();
+    const pad = (n) => String(n).padStart(2, '0');
+    const today = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
 
     const enriched = connections.map(conn => {
-        if (conn.status !== 'active') return { ...conn, todayStats: null };
+        let isOnline = isDeveloperOnline(conn.developer_id);
+        if (!isOnline && conn.last_seen) {
+            const lastSeenTime = new Date(conn.last_seen.includes('T') ? conn.last_seen : conn.last_seen + 'Z').getTime();
+            if (!isNaN(lastSeenTime) && (Date.now() - lastSeenTime) < 5 * 60 * 1000) {
+                isOnline = true;
+            }
+        }
+
+        if (conn.status !== 'active') {
+            return {
+                ...conn,
+                isOnline: false,
+                todayStats: { total_seconds: 0, lines_added: 0, lines_deleted: 0, lines_modified: 0, current_project: null }
+            };
+        }
 
         const stats = db.prepare(`
             SELECT SUM(active_seconds) AS total_seconds,
                    SUM(lines_added) AS lines_added,
-                   project_name AS current_project
+                   SUM(lines_deleted) AS lines_deleted,
+                   SUM(lines_modified) AS lines_modified,
+                   (
+                       SELECT project_name FROM telemetry
+                       WHERE user_id = ? AND (recorded_at LIKE ? OR substr(recorded_at, 1, 10) = ?)
+                       ORDER BY id DESC LIMIT 1
+                   ) AS current_project
             FROM telemetry
-            WHERE user_id = ? AND recorded_at LIKE ?
-            GROUP BY project_name ORDER BY total_seconds DESC LIMIT 1
-        `).get(conn.developer_id, `${today}%`);
+            WHERE user_id = ? AND (recorded_at LIKE ? OR substr(recorded_at, 1, 10) = ?)
+        `).get(conn.developer_id, `${today}%`, today, conn.developer_id, `${today}%`, today);
 
-        return { ...conn, todayStats: stats || { total_seconds: 0, lines_added: 0, current_project: null } };
+        return {
+            ...conn,
+            isOnline,
+            todayStats: stats || { total_seconds: 0, lines_added: 0, lines_deleted: 0, lines_modified: 0, current_project: null }
+        };
     });
 
     return res.json({ team: enriched });

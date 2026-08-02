@@ -11,9 +11,19 @@ function getProjects(req, res) {
           AND last_seen <= datetime('now', '-30 days')
     `).run(req.user.id);
 
-    const projects = db.prepare(
-        'SELECT * FROM projects WHERE user_id = ? ORDER BY last_seen DESC'
-    ).all(req.user.id);
+    const projects = db.prepare(`
+        SELECT 
+            p.*,
+            COALESCE(SUM(t.active_seconds), 0) AS total_seconds,
+            COALESCE(SUM(t.lines_added), 0) AS lines_added,
+            COALESCE(SUM(t.lines_deleted), 0) AS lines_deleted,
+            COALESCE(SUM(t.lines_modified), 0) AS lines_modified
+        FROM projects p
+        LEFT JOIN telemetry t ON p.user_id = t.user_id AND p.name = t.project_name
+        WHERE p.user_id = ?
+        GROUP BY p.id
+        ORDER BY p.last_seen DESC
+    `).all(req.user.id);
 
     return res.json({ projects });
 }

@@ -73,6 +73,12 @@ function attachWebSocketServer(httpServer) {
     return wss;
 }
 
+function sendToUser(userId, payload) {
+    const sockets = clientsByUser.get(userId);
+    if (!sockets) return;
+    for (const ws of sockets) send(ws, payload);
+}
+
 function broadcastToRecruiters(developerId, payload) {
     const recruiters = db.prepare(`
         SELECT recruiter_id FROM connections
@@ -80,9 +86,7 @@ function broadcastToRecruiters(developerId, payload) {
     `).all(developerId);
 
     for (const { recruiter_id } of recruiters) {
-        const sockets = clientsByUser.get(recruiter_id);
-        if (!sockets) continue;
-        for (const ws of sockets) send(ws, payload);
+        sendToUser(recruiter_id, payload);
     }
 }
 
@@ -95,4 +99,27 @@ function isDeveloperOnline(developerId) {
     return !!(sockets && sockets.size > 0);
 }
 
-module.exports = { attachWebSocketServer, isDeveloperOnline };
+function notifyTelemetryUpdate(developerId) {
+    db.prepare("UPDATE users SET last_seen = datetime('now') WHERE id = ?").run(developerId);
+    const payload = { type: 'telemetry_updated', developerId, timestamp: new Date().toISOString() };
+    sendToUser(developerId, payload);
+    broadcastToRecruiters(developerId, payload);
+    broadcastToRecruiters(developerId, {
+        type: 'developer_online',
+        developerId,
+        timestamp: new Date().toISOString()
+    });
+}
+
+function notifyConnectionUpdate(recruiterId, developerId) {
+    const payload = { type: 'connection_updated', recruiterId, developerId, timestamp: new Date().toISOString() };
+    if (recruiterId) sendToUser(recruiterId, payload);
+    if (developerId) sendToUser(developerId, payload);
+}
+
+module.exports = {
+    attachWebSocketServer,
+    isDeveloperOnline,
+    notifyTelemetryUpdate,
+    notifyConnectionUpdate
+};

@@ -1,4 +1,5 @@
 const db = require('../../config/db');
+const { notifyTelemetryUpdate } = require('../../websocket/wsServer');
 
 function ensureTelemetryUser() {
     const existing = db.prepare('SELECT id FROM users WHERE email = ?').get('telemetry@coderlens.local');
@@ -29,6 +30,25 @@ function resolveUserId(req, payload) {
     return ensureTelemetryUser();
 }
 
+function resolveProjectName(rec) {
+    if (rec.projectName) return rec.projectName;
+
+    if (rec.gitRepo && rec.gitRepo !== 'local') {
+        return rec.gitRepo.split('/').pop().replace(/\.git$/, '');
+    }
+
+    const filePath = typeof rec.filePath === 'string' ? rec.filePath : '';
+    const parts = filePath.split(/[\\/]/).filter(Boolean); // handles both / and \
+    return parts[0] || 'local-project';
+}
+
+function toLocalSqlDate(dateInput) {
+    const d = dateInput ? new Date(dateInput) : new Date();
+    if (isNaN(d.getTime())) return new Date().toISOString().slice(0, 19).replace('T', ' ');
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+
 function ingestActivity(req, res) {
     console.log("📩 Telemetry request received");
     console.log(req.body);
@@ -36,26 +56,77 @@ function ingestActivity(req, res) {
         const payload = req.body || {};
         const userId = ensureUserExists(resolveUserId(req, payload));
         const events = Array.isArray(payload.events) ? payload.events : [];
-        const batchTimestamp = payload.timestamp || new Date().toISOString();
+        const batchTimestamp = toLocalSqlDate(payload.timestamp);
 
         if (!Array.isArray(events) || events.length === 0)
             return res.status(200).json({ status: 'ok', inserted: 0 });
+
+        db.prepare("UPDATE users SET last_seen = datetime('now') WHERE id = ?").run(userId);
 
         const insert = db.prepare(`
             INSERT INTO telemetry (
                 user_id, file_path, file_name, language_id,
                 project_name, project_framework, git_branch, git_repo,
                 active_seconds, lines_added, lines_deleted, lines_modified,
-                raw_code_changes, recorded_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                raw_code_changes, last_commit_hash, last_commit_message, last_commit_timestamp, last_commit_status, recorded_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `);
 
         const insertMany = db.transaction((evts) => {
             for (const rec of evts) {
-                const filePath = typeof rec.filePath === 'string' ? rec.filePath : '';
-                const projectName = rec.gitRepo && rec.gitRepo !== 'local'
-                    ? rec.gitRepo.split('/').pop()
-                    : (filePath.split('/')[0] || 'unknown');
+                const projectName = resolveProjectName(rec);
+                const hasRemote = !!(rec.gitRepo && rec.gitRepo !== 'local');
+
+                if (rec.lastCommitStatus === 'committed') {
+                    db.prepare(`
+                        UPDATE telemetry
+                        SET last_commit_status = 'committed',
+                            last_commit_hash = ?,
+                            last_commit_message = ?,
+                            last_commit_timestamp = ?
+                        WHERE user_id = ?
+                          AND project_name = ?
+                          AND (? = 0 OR git_repo = ?)
+                          AND last_commit_status = 'uncommitted'
+                    `).run(
+                        rec.lastCommitHash || 'none',
+                        rec.lastCommitMessage || '',
+                        rec.lastCommitTimestamp || '',
+                        userId,
+                        projectName,
+                        hasRemote ? 1 : 0,
+                        rec.gitRepo || ''
+                    );
+
+                    db.prepare(`
+                        UPDATE projects
+                        SET last_commit_status = 'committed',
+                            last_commit_hash = ?,
+                            last_commit_message = ?,
+                            last_commit_timestamp = ?
+                        WHERE user_id = ?
+                          AND (repo_name = ? OR name = ?)
+                          AND last_commit_status = 'uncommitted'
+                    `).run(
+                        rec.lastCommitHash || 'none',
+                        rec.lastCommitMessage || '',
+                        rec.lastCommitTimestamp || '',
+                        userId,
+                        projectName,
+                        projectName
+                    );
+                }
+
+                const activeSecs   = Number(rec.activeSeconds ?? rec.active_seconds) || 0;
+                const linesAdded   = Number(rec.linesAdded ?? rec.lines_added) || 0;
+                const linesDeleted = Number(rec.linesDeleted ?? rec.lines_deleted) || 0;
+                const linesModified = Number(rec.linesModified ?? rec.lines_modified) || 0;
+
+                // Skip rows with zero activity AND zero line changes — commit updates
+                // are already handled by the UPDATE above, no new row needed.
+                if (activeSecs === 0 && linesAdded === 0 && linesDeleted === 0 && linesModified === 0) {
+                    continue;
+                }
 
                 insert.run(
                     userId,
@@ -66,11 +137,15 @@ function ingestActivity(req, res) {
                     rec.projectFramework || 'none',
                     rec.gitBranch || 'none',
                     rec.gitRepo || 'local',
-                    Number(rec.activeSeconds) || 0,
-                    Number(rec.linesAdded) || 0,
-                    Number(rec.linesDeleted) || 0,
-                    Number(rec.linesModified) || 0,
+                    activeSecs,
+                    linesAdded,
+                    linesDeleted,
+                    linesModified,
                     JSON.stringify(rec.rawCodeChanges || []),
+                    rec.lastCommitHash || 'none',
+                    rec.lastCommitMessage || '',
+                    rec.lastCommitTimestamp || '',
+                    rec.lastCommitStatus || 'unknown',
                     batchTimestamp
                 );
             }
@@ -78,6 +153,7 @@ function ingestActivity(req, res) {
 
         insertMany(events);
         upsertProjects(userId, events, batchTimestamp);
+        try { notifyTelemetryUpdate(userId); } catch (e) { console.error('[ws] notification failed:', e); }
 
         return res.status(200).json({ status: 'success', inserted: events.length });
     } catch (err) {
@@ -90,26 +166,25 @@ function upsertProjects(userId, events, timestamp) {
     const seen = new Set();
 
     for (const rec of events) {
-        const repoName = rec.gitRepo && rec.gitRepo !== 'local'
-            ? rec.gitRepo.split('/').pop()
-            : (rec.filePath.split('/')[0] || null);
-
-        if (!repoName || seen.has(repoName)) continue;
-        seen.add(repoName);
+        const projectName = resolveProjectName(rec);
+        if (seen.has(projectName)) continue;
+        seen.add(projectName);
 
         const existing = db.prepare(
             'SELECT id FROM projects WHERE user_id = ? AND repo_name = ?'
-        ).get(userId, repoName);
+        ).get(userId, projectName);
 
         if (existing) {
             db.prepare(`
-                UPDATE projects SET last_seen = ?, status = 'in_progress' WHERE id = ?
-            `).run(timestamp, existing.id);
+                UPDATE projects
+                SET last_seen = ?, status = 'in_progress', last_commit_hash = ?, last_commit_message = ?, last_commit_timestamp = ?, last_commit_status = ?
+                WHERE id = ?
+            `).run(timestamp, rec.lastCommitHash || 'none', rec.lastCommitMessage || '', rec.lastCommitTimestamp || '', rec.lastCommitStatus || 'unknown', existing.id);
         } else {
             db.prepare(`
-                INSERT INTO projects (user_id, name, repo_name, framework, first_seen, last_seen)
-                VALUES (?, ?, ?, ?, ?, ?)
-            `).run(userId, repoName, repoName, rec.projectFramework || 'none', timestamp, timestamp);
+                INSERT INTO projects (user_id, name, repo_name, framework, first_seen, last_seen, last_commit_hash, last_commit_message, last_commit_timestamp, last_commit_status)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `).run(userId, projectName, projectName, rec.projectFramework || 'none', timestamp, timestamp, rec.lastCommitHash || 'none', rec.lastCommitMessage || '', rec.lastCommitTimestamp || '', rec.lastCommitStatus || 'unknown');
         }
     }
 }
