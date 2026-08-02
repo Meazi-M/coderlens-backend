@@ -174,4 +174,48 @@ function calendarReport(req, res) {
     return res.json({ weeks, days: rows });
 }
 
-module.exports = { dailyReport, dailyReportMe, weeklyReport, monthlyReport, calendarReport };
+function _commitsReport(res, devId, yearParam) {
+    const year = parseInt(yearParam || new Date().getFullYear(), 10);
+    const startDate = `${year}-01-01`;
+    const endDate = `${year}-12-31`;
+
+    const dailyContributions = db.prepare(`
+        SELECT date, SUM(cnt) AS count FROM (
+            SELECT substr(committed_at, 1, 10) AS date, COUNT(*) AS cnt
+            FROM commits
+            WHERE user_id = ? AND substr(committed_at, 1, 10) BETWEEN ? AND ?
+            GROUP BY date
+            UNION ALL
+            SELECT substr(recorded_at, 1, 10) AS date, COUNT(DISTINCT id) AS cnt
+            FROM telemetry
+            WHERE user_id = ? AND active_seconds > 0 AND substr(recorded_at, 1, 10) BETWEEN ? AND ?
+            GROUP BY date
+        ) GROUP BY date ORDER BY date ASC
+    `).all(devId, startDate, endDate, devId, startDate, endDate);
+
+    const commits = db.prepare(`
+        SELECT id, project_name, git_branch, git_repo, commit_hash, commit_message, committed_at
+        FROM commits
+        WHERE user_id = ? AND substr(committed_at, 1, 10) BETWEEN ? AND ?
+        ORDER BY committed_at DESC
+    `).all(devId, startDate, endDate);
+
+    const totalCommits = commits.length;
+
+    return res.json({ year, totalCommits, dailyContributions, commits });
+}
+
+function getCommitsReport(req, res) {
+    const devId = parseInt(req.params.devId, 10);
+    if (!canView(req.user.id, req.user.role, devId))
+        return res.status(403).json({ error: 'Access denied' });
+    return _commitsReport(res, devId, req.query.year);
+}
+
+function getCommitsReportMe(req, res) {
+    if (req.user.role !== 'developer')
+        return res.status(403).json({ error: 'Only developers can view their commit reports' });
+    return _commitsReport(res, req.user.id, req.query.year);
+}
+
+module.exports = { dailyReport, dailyReportMe, weeklyReport, monthlyReport, calendarReport, getCommitsReport, getCommitsReportMe };

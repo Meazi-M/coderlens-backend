@@ -115,6 +115,23 @@ function ingestActivity(req, res) {
                         projectName,
                         projectName
                     );
+
+                    if (rec.lastCommitHash && !['none', 'uncommitted', 'unknown'].includes(rec.lastCommitHash)) {
+                        try {
+                            db.prepare(`
+                                INSERT OR IGNORE INTO commits (user_id, project_name, git_branch, git_repo, commit_hash, commit_message, committed_at)
+                                VALUES (?, ?, ?, ?, ?, ?, ?)
+                            `).run(
+                                userId,
+                                projectName,
+                                rec.gitBranch || 'main',
+                                rec.gitRepo || 'local',
+                                rec.lastCommitHash,
+                                rec.lastCommitMessage || '',
+                                rec.lastCommitTimestamp || batchTimestamp
+                            );
+                        } catch (e) {}
+                    }
                 }
 
                 const activeSecs   = Number(rec.activeSeconds ?? rec.active_seconds) || 0;
@@ -122,11 +139,19 @@ function ingestActivity(req, res) {
                 const linesDeleted = Number(rec.linesDeleted ?? rec.lines_deleted) || 0;
                 const linesModified = Number(rec.linesModified ?? rec.lines_modified) || 0;
 
-                // Skip rows with zero activity AND zero line changes — commit updates
-                // are already handled by the UPDATE above, no new row needed.
-                if (activeSecs === 0 && linesAdded === 0 && linesDeleted === 0 && linesModified === 0) {
+                // Skip rows with zero active seconds to prevent storing 0-second heartbeat entries
+                if (activeSecs === 0) {
                     continue;
                 }
+
+                // Privacy protection: Sanitize raw code changes — exclude typed text (content)
+                const rawChanges = Array.isArray(rec.rawCodeChanges) ? rec.rawCodeChanges : [];
+                const sanitizedChanges = rawChanges.map(change => ({
+                    timeStamp: change.timeStamp || Date.now(),
+                    type: change.type || 'modify',
+                    line: change.line || 1,
+                    amount: change.amount || 0
+                }));
 
                 insert.run(
                     userId,
@@ -141,7 +166,7 @@ function ingestActivity(req, res) {
                     linesAdded,
                     linesDeleted,
                     linesModified,
-                    JSON.stringify(rec.rawCodeChanges || []),
+                    JSON.stringify(sanitizedChanges),
                     rec.lastCommitHash || 'none',
                     rec.lastCommitMessage || '',
                     rec.lastCommitTimestamp || '',

@@ -76,10 +76,23 @@ db.exec(`
         last_commit_timestamp TEXT,
         created_at          TEXT    NOT NULL DEFAULT (datetime('now'))
     );
+    CREATE TABLE IF NOT EXISTS commits (
+        id             INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id        INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        project_name   TEXT    NOT NULL,
+        git_branch     TEXT,
+        git_repo       TEXT,
+        commit_hash    TEXT    NOT NULL,
+        commit_message TEXT,
+        committed_at   TEXT    NOT NULL,
+        created_at     TEXT    NOT NULL DEFAULT (datetime('now')),
+        UNIQUE(user_id, project_name, commit_hash)
+    );
     CREATE INDEX IF NOT EXISTS idx_telemetry_user_date ON telemetry(user_id, recorded_at);
     CREATE INDEX IF NOT EXISTS idx_telemetry_project   ON telemetry(user_id, project_name);
     CREATE INDEX IF NOT EXISTS idx_connections_recruiter ON connections(recruiter_id, status);
     CREATE INDEX IF NOT EXISTS idx_connections_developer ON connections(developer_id, status);
+    CREATE INDEX IF NOT EXISTS idx_commits_user_date     ON commits(user_id, committed_at);
 `);
 
 ensureColumn('telemetry', 'last_commit_hash', 'TEXT');
