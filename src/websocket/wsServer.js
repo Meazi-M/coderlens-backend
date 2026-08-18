@@ -1,6 +1,6 @@
 const { WebSocketServer } = require('ws');
 const jwt = require('jsonwebtoken');
-const db = require('../config/db');
+const { User, Connection } = require('../config/db');
 
 const SECRET = process.env.JWT_SECRET || 'coderlens-dev-secret-change-in-production';
 
@@ -10,7 +10,7 @@ const clientsByUser = new Map();
 function attachWebSocketServer(httpServer) {
     const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
 
-    wss.on('connection', (ws, req) => {
+    wss.on('connection', async (ws, req) => {
         const url = new URL(req.url, 'http://localhost');
         const token = url.searchParams.get('token');
 
@@ -23,7 +23,7 @@ function attachWebSocketServer(httpServer) {
         if (!clientsByUser.has(user.id)) clientsByUser.set(user.id, new Set());
         clientsByUser.get(user.id).add(ws);
 
-        db.prepare("UPDATE users SET last_seen = datetime('now') WHERE id = ?").run(user.id);
+        User.update({ last_seen: new Date() }, { where: { id: user.id } }).catch(() => {});
 
         if (user.role === 'developer') {
             broadcastToRecruiters(user.id, {
@@ -79,14 +79,18 @@ function sendToUser(userId, payload) {
     for (const ws of sockets) send(ws, payload);
 }
 
-function broadcastToRecruiters(developerId, payload) {
-    const recruiters = db.prepare(`
-        SELECT recruiter_id FROM connections
-        WHERE developer_id = ? AND status = 'active'
-    `).all(developerId);
+async function broadcastToRecruiters(developerId, payload) {
+    try {
+        const recruiters = await Connection.findAll({
+            where: { developer_id: developerId, status: 'active' },
+            attributes: ['recruiter_id'],
+        });
 
-    for (const { recruiter_id } of recruiters) {
-        sendToUser(recruiter_id, payload);
+        for (const conn of recruiters) {
+            sendToUser(conn.recruiter_id, payload);
+        }
+    } catch (e) {
+        console.error('[ws] broadcastToRecruiters error:', e.message);
     }
 }
 
@@ -99,8 +103,8 @@ function isDeveloperOnline(developerId) {
     return !!(sockets && sockets.size > 0);
 }
 
-function notifyTelemetryUpdate(developerId) {
-    db.prepare("UPDATE users SET last_seen = datetime('now') WHERE id = ?").run(developerId);
+async function notifyTelemetryUpdate(developerId) {
+    User.update({ last_seen: new Date() }, { where: { id: developerId } }).catch(() => {});
     const payload = { type: 'telemetry_updated', developerId, timestamp: new Date().toISOString() };
     sendToUser(developerId, payload);
     broadcastToRecruiters(developerId, payload);

@@ -1,7 +1,8 @@
-const db = require('../../config/db');
+const { Op, QueryTypes } = require('sequelize');
+const { sequelize, User, Connection, Telemetry } = require('../../config/db');
 const { notifyConnectionUpdate, isDeveloperOnline } = require('../../websocket/wsServer');
 
-function sendRequest(req, res) {
+async function sendRequest(req, res) {
     if (req.user.role !== 'recruiter')
         return res.status(403).json({ error: 'Only recruiters can send connection requests' });
 
@@ -9,14 +10,15 @@ function sendRequest(req, res) {
     if (!developerEmail)
         return res.status(400).json({ error: 'developerEmail is required' });
 
-    const developer = db.prepare(
-        "SELECT id, name, email FROM users WHERE email = ? AND role = 'developer'"
-    ).get(developerEmail);
+    const developer = await User.findOne({
+        where: { email: developerEmail, role: 'developer' },
+        attributes: ['id', 'name', 'email'],
+    });
     if (!developer) return res.status(404).json({ error: 'No developer found with that email' });
 
-    const existing = db.prepare(
-        'SELECT id, status FROM connections WHERE recruiter_id = ? AND developer_id = ?'
-    ).get(req.user.id, developer.id);
+    const existing = await Connection.findOne({
+        where: { recruiter_id: req.user.id, developer_id: developer.id },
+    });
 
     if (existing) {
         if (existing.status === 'terminated')
@@ -24,18 +26,17 @@ function sendRequest(req, res) {
         return res.status(409).json({ error: `Connection already exists: ${existing.status}` });
     }
 
-    const result = db.prepare(
-        'INSERT INTO connections (recruiter_id, developer_id) VALUES (?, ?)'
-    ).run(req.user.id, developer.id);
+    const conn = await Connection.create({
+        recruiter_id: req.user.id,
+        developer_id: developer.id,
+    });
 
     try { notifyConnectionUpdate(req.user.id, developer.id); } catch (e) {}
 
-    return res.json({
-        connection: db.prepare('SELECT * FROM connections WHERE id = ?').get(result.lastInsertRowid)
-    });
+    return res.json({ connection: conn.toJSON() });
 }
 
-function respondToRequest(req, res) {
+async function respondToRequest(req, res) {
     if (req.user.role !== 'developer')
         return res.status(403).json({ error: 'Only developers can respond to requests' });
 
@@ -43,150 +44,278 @@ function respondToRequest(req, res) {
     if (!['accept', 'reject'].includes(action))
         return res.status(400).json({ error: 'action must be accept or reject' });
 
-    const conn = db.prepare(
-        'SELECT * FROM connections WHERE id = ? AND developer_id = ?'
-    ).get(req.params.id, req.user.id);
+    const conn = await Connection.findOne({
+        where: { id: req.params.id, developer_id: req.user.id },
+    });
 
     if (!conn) return res.status(404).json({ error: 'Connection not found' });
     if (conn.status !== 'pending')
         return res.status(400).json({ error: `Cannot respond to a ${conn.status} connection` });
 
     const newStatus = action === 'accept' ? 'active' : 'terminated';
-    db.prepare(
-        "UPDATE connections SET status = ?, responded_at = datetime('now') WHERE id = ?"
-    ).run(newStatus, conn.id);
+    await conn.update({ status: newStatus, paused_by: null, paused_at: null, responded_at: new Date() });
 
     try { notifyConnectionUpdate(conn.recruiter_id, conn.developer_id); } catch (e) {}
 
     return res.json({ status: newStatus });
 }
 
-function toggleConnection(req, res) {
-    const conn = db.prepare(
-        'SELECT * FROM connections WHERE id = ? AND (developer_id = ? OR recruiter_id = ?)'
-    ).get(req.params.id, req.user.id, req.user.id);
+async function toggleConnection(req, res) {
+    const conn = await Connection.findOne({
+        where: {
+            id: req.params.id,
+            [Op.or]: [{ developer_id: req.user.id }, { recruiter_id: req.user.id }],
+        },
+    });
 
     if (!conn) return res.status(404).json({ error: 'Connection not found' });
     if (['terminated', 'pending'].includes(conn.status))
         return res.status(400).json({ error: `Cannot toggle a ${conn.status} connection` });
 
-    const newStatus = req.body.active ? 'active' : 'paused';
-    db.prepare('UPDATE connections SET status = ? WHERE id = ?').run(newStatus, conn.id);
+    const isPausing = !req.body.active;
+    const userRole = req.user.role; // 'developer' or 'recruiter'
+
+    // If attempting to RESUME (active: true), check if the current user is allowed to resume
+    if (!isPausing) {
+        if (conn.status === 'paused' && conn.paused_by && conn.paused_by !== userRole) {
+            const roleLabel = conn.paused_by === 'developer' ? 'developer' : 'team lead';
+            return res.status(403).json({
+                error: `Tracking was paused by the ${roleLabel}. Only the user who paused it can resume.`
+            });
+        }
+    }
+
+    if (isPausing) {
+        await conn.update({
+            status: 'paused',
+            paused_by: userRole,
+            paused_at: new Date(),
+        });
+    } else {
+        // Record completed pause interval for recruiter data isolation
+        let intervals = [];
+        try {
+            intervals = JSON.parse(conn.pause_intervals || '[]');
+        } catch (e) {
+            intervals = [];
+        }
+
+        if (conn.paused_at) {
+            intervals.push({
+                start: new Date(conn.paused_at).toISOString(),
+                end: new Date().toISOString(),
+                paused_by: conn.paused_by, // 'developer' | 'recruiter' — used for self-filter in reports
+            });
+        }
+
+        await conn.update({
+            status: 'active',
+            paused_by: null,
+            paused_at: null,
+            pause_intervals: JSON.stringify(intervals),
+        });
+    }
 
     try { notifyConnectionUpdate(conn.recruiter_id, conn.developer_id); } catch (e) {}
 
-    return res.json({ status: newStatus });
+    return res.json({ status: conn.status, paused_by: conn.paused_by });
 }
 
-function terminateConnection(req, res) {
-    const conn = db.prepare(
-        'SELECT * FROM connections WHERE id = ? AND (developer_id = ? OR recruiter_id = ?)'
-    ).get(req.params.id, req.user.id, req.user.id);
+async function terminateConnection(req, res) {
+    const conn = await Connection.findOne({
+        where: {
+            id: req.params.id,
+            [Op.or]: [{ developer_id: req.user.id }, { recruiter_id: req.user.id }],
+        },
+    });
 
     if (!conn) return res.status(404).json({ error: 'Connection not found' });
     if (conn.status === 'terminated')
         return res.status(400).json({ error: 'Already terminated' });
 
-    db.prepare(
-        "UPDATE connections SET status = 'terminated', terminated_at = datetime('now') WHERE id = ?"
-    ).run(conn.id);
+    await conn.update({ status: 'terminated', paused_by: null, paused_at: null, terminated_at: new Date() });
 
     try { notifyConnectionUpdate(conn.recruiter_id, conn.developer_id); } catch (e) {}
 
     return res.json({ message: 'Connection permanently terminated' });
 }
 
-function getMyTeam(req, res) {
+/**
+ * Helper to build SQL WHERE conditions excluding telemetry recorded during pause periods for recruiter queries
+ */
+function buildPauseExclusionSql(conn) {
+    const conditions = [];
+
+    // Exclude currently ongoing pause period
+    if (conn.status === 'paused' && conn.paused_at) {
+        const pauseStartIso = new Date(conn.paused_at).toISOString();
+        conditions.push(`recorded_at < '${pauseStartIso}'`);
+    }
+
+    // Exclude past completed pause intervals
+    let intervals = [];
+    try { intervals = JSON.parse(conn.pause_intervals || '[]'); } catch (e) {}
+
+    if (Array.isArray(intervals) && intervals.length > 0) {
+        for (const interval of intervals) {
+            if (interval.start && interval.end) {
+                conditions.push(`NOT (recorded_at >= '${interval.start}' AND recorded_at <= '${interval.end}')`);
+            }
+        }
+    }
+
+    if (conditions.length === 0) return '';
+    return ' AND (' + conditions.join(' AND ') + ')';
+}
+
+async function getMyTeam(req, res) {
     if (req.user.role !== 'recruiter')
         return res.status(403).json({ error: 'Only recruiters can view their team' });
 
-    const connections = db.prepare(`
-        SELECT c.id AS connection_id, c.status, c.initiated_at,
-               u.id AS developer_id, u.name, u.email, u.avatar_url, u.last_seen
-        FROM connections c
-        JOIN users u ON u.id = c.developer_id
-        WHERE c.recruiter_id = ? AND c.status IN ('active', 'paused')
-        ORDER BY c.status ASC, u.name ASC
-    `).all(req.user.id);
+    const connections = await Connection.findAll({
+        where: {
+            recruiter_id: req.user.id,
+            status: { [Op.in]: ['active', 'paused'] },
+        },
+        include: [{
+            model: User,
+            as: 'developer',
+            attributes: ['id', 'name', 'email', 'avatar_url', 'last_seen'],
+        }],
+        order: [['status', 'ASC'], [{ model: User, as: 'developer' }, 'name', 'ASC']],
+    });
 
     const now = new Date();
     const pad = (n) => String(n).padStart(2, '0');
     const today = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
 
-    const enriched = connections.map(conn => {
-        let isOnline = isDeveloperOnline(conn.developer_id);
-        if (!isOnline && conn.last_seen) {
-            const lastSeenTime = new Date(conn.last_seen.includes('T') ? conn.last_seen : conn.last_seen + 'Z').getTime();
+    const enriched = await Promise.all(connections.map(async (connRec) => {
+        const conn = connRec.toJSON();
+        const dev = conn.developer;
+
+        let isOnline = isDeveloperOnline(dev.id);
+        if (conn.status === 'paused') {
+            isOnline = false; // Hide live online status if stream is currently paused
+        } else if (!isOnline && dev.last_seen) {
+            const lastSeenTime = new Date(dev.last_seen).getTime();
             if (!isNaN(lastSeenTime) && (Date.now() - lastSeenTime) < 5 * 60 * 1000) {
                 isOnline = true;
             }
         }
 
-        if (conn.status !== 'active') {
-            return {
-                ...conn,
-                isOnline: false,
-                todayStats: { total_seconds: 0, lines_added: 0, lines_deleted: 0, lines_modified: 0, current_project: null }
-            };
-        }
+        const base = {
+            connection_id: conn.id,
+            status:        conn.status,
+            paused_by:     conn.paused_by || null,
+            initiated_at:  conn.initiated_at,
+            developer_id:  dev.id,
+            name:          dev.name,
+            email:         dev.email,
+            avatar_url:    dev.avatar_url,
+            last_seen:     dev.last_seen,
+            isOnline,
+        };
 
-        const stats = db.prepare(`
-            SELECT SUM(active_seconds) AS total_seconds,
-                   SUM(lines_added) AS lines_added,
-                   SUM(lines_deleted) AS lines_deleted,
-                   SUM(lines_modified) AS lines_modified,
-                   (
-                       SELECT project_name FROM telemetry
-                       WHERE user_id = ? AND (recorded_at LIKE ? OR substr(recorded_at, 1, 10) = ?)
-                       ORDER BY id DESC LIMIT 1
-                   ) AS current_project
+        const pauseFilter = buildPauseExclusionSql(conn);
+
+        // Query daily stats matching DATE(recorded_at) = today AND excluding paused periods
+        const [statsRows] = await sequelize.query(`
+            SELECT
+                COALESCE(SUM(active_seconds), 0)  AS total_seconds,
+                COALESCE(SUM(lines_added), 0)     AS lines_added,
+                COALESCE(SUM(lines_deleted), 0)   AS lines_deleted,
+                COALESCE(SUM(lines_modified), 0)  AS lines_modified,
+                (
+                    SELECT project_name FROM telemetry
+                    WHERE user_id = :devId AND DATE(recorded_at) = :today ${pauseFilter}
+                    ORDER BY id DESC LIMIT 1
+                ) AS current_project
             FROM telemetry
-            WHERE user_id = ? AND (recorded_at LIKE ? OR substr(recorded_at, 1, 10) = ?)
-        `).get(conn.developer_id, `${today}%`, today, conn.developer_id, `${today}%`, today);
+            WHERE user_id = :devId AND DATE(recorded_at) = :today ${pauseFilter}
+        `, {
+            replacements: { devId: dev.id, today },
+            type: QueryTypes.SELECT,
+        });
 
         return {
-            ...conn,
-            isOnline,
-            todayStats: stats || { total_seconds: 0, lines_added: 0, lines_deleted: 0, lines_modified: 0, current_project: null }
+            ...base,
+            todayStats: {
+                total_seconds:   Number(statsRows?.total_seconds || 0),
+                lines_added:     Number(statsRows?.lines_added || 0),
+                lines_deleted:   Number(statsRows?.lines_deleted || 0),
+                lines_modified:  Number(statsRows?.lines_modified || 0),
+                current_project: statsRows?.current_project || null,
+            },
         };
-    });
+    }));
 
     return res.json({ team: enriched });
 }
 
-function getPendingRequests(req, res) {
+async function getPendingRequests(req, res) {
     if (req.user.role !== 'developer')
         return res.status(403).json({ error: 'Only developers can view pending requests' });
 
-    const requests = db.prepare(`
-        SELECT c.id AS connection_id, c.initiated_at,
-               u.id AS recruiter_id, u.name, u.email, u.avatar_url
-        FROM connections c
-        JOIN users u ON u.id = c.recruiter_id
-        WHERE c.developer_id = ? AND c.status = 'pending'
-        ORDER BY c.initiated_at DESC
-    `).all(req.user.id);
+    const requests = await Connection.findAll({
+        where: { developer_id: req.user.id, status: 'pending' },
+        include: [{
+            model: User,
+            as: 'recruiter',
+            attributes: ['id', 'name', 'email', 'avatar_url'],
+        }],
+        order: [['initiated_at', 'DESC']],
+    });
 
-    return res.json({ requests });
+    return res.json({
+        requests: requests.map(r => {
+            const c = r.toJSON();
+            return {
+                connection_id: c.id,
+                initiated_at:  c.initiated_at,
+                recruiter_id:  c.recruiter.id,
+                name:          c.recruiter.name,
+                email:         c.recruiter.email,
+                avatar_url:    c.recruiter.avatar_url,
+            };
+        }),
+    });
 }
 
-function getMyConnections(req, res) {
+async function getMyConnections(req, res) {
     if (req.user.role !== 'developer')
         return res.status(403).json({ error: 'Only developers can view their connections' });
 
-    const connections = db.prepare(`
-        SELECT c.id AS connection_id, c.status, c.initiated_at,
-               u.id AS recruiter_id, u.name, u.email, u.avatar_url
-        FROM connections c
-        JOIN users u ON u.id = c.recruiter_id
-        WHERE c.developer_id = ? AND c.status IN ('active', 'paused')
-        ORDER BY c.status ASC, u.name ASC
-    `).all(req.user.id);
+    const connections = await Connection.findAll({
+        where: {
+            developer_id: req.user.id,
+            status: { [Op.in]: ['active', 'paused'] },
+        },
+        include: [{
+            model: User,
+            as: 'recruiter',
+            attributes: ['id', 'name', 'email', 'avatar_url'],
+        }],
+        order: [['status', 'ASC'], [{ model: User, as: 'recruiter' }, 'name', 'ASC']],
+    });
 
-    return res.json({ connections });
+    return res.json({
+        connections: connections.map(c => {
+            const conn = c.toJSON();
+            return {
+                connection_id: conn.id,
+                status:        conn.status,
+                paused_by:     conn.paused_by || null,
+                initiated_at:  conn.initiated_at,
+                recruiter_id:  conn.recruiter.id,
+                name:          conn.recruiter.name,
+                email:         conn.recruiter.email,
+                avatar_url:    conn.recruiter.avatar_url,
+            };
+        }),
+    });
 }
 
 module.exports = {
     sendRequest, respondToRequest, toggleConnection,
-    terminateConnection, getMyTeam, getPendingRequests, getMyConnections
+    terminateConnection, getMyTeam, getPendingRequests, getMyConnections,
 };

@@ -1,183 +1,174 @@
-const db = require('../../config/db');
+const { Op, fn, col, literal, QueryTypes } = require('sequelize');
+const { sequelize, User, Telemetry, Project, Commit } = require('../../config/db');
 const { notifyTelemetryUpdate } = require('../../websocket/wsServer');
 
-function ensureTelemetryUser() {
-    const existing = db.prepare('SELECT id FROM users WHERE email = ?').get('telemetry@coderlens.local');
-    if (existing) return existing.id;
+// ── helpers ──────────────────────────────────────────────────────────────────
 
-    const result = db.prepare(`
-        INSERT INTO users (name, email, password, role)
-        VALUES (?, ?, ?, ?)
-    `).run('Telemetry User', 'telemetry@coderlens.local', null, 'developer');
-
-    return result.lastInsertRowid;
+async function ensureTelemetryUser() {
+    const email = 'telemetry@coderlens.local';
+    let user = await User.findOne({ where: { email } });
+    if (!user) {
+        user = await User.create({ name: 'Telemetry User', email, password: null, role: 'developer' });
+    }
+    return user.id;
 }
 
-function ensureUserExists(userId) {
-    const existing = db.prepare('SELECT id FROM users WHERE id = ?').get(userId);
-    if (existing) return userId;
+async function ensureUserExists(userId) {
+    const user = await User.findByPk(userId);
+    if (user) return userId;
     return ensureTelemetryUser();
 }
 
 function resolveUserId(req, payload) {
     if (req.user && req.user.id) return req.user.id;
-
     const bodyUserId = Number(payload?.userId || payload?.user_id || req.query?.userId);
-    if (Number.isInteger(bodyUserId) && bodyUserId > 0) {
-        return bodyUserId;
-    }
-
-    return ensureTelemetryUser();
+    if (Number.isInteger(bodyUserId) && bodyUserId > 0) return bodyUserId;
+    return null; // will be resolved to telemetry user async
 }
 
 function resolveProjectName(rec) {
     if (rec.projectName) return rec.projectName;
-
     if (rec.gitRepo && rec.gitRepo !== 'local') {
         return rec.gitRepo.split('/').pop().replace(/\.git$/, '');
     }
-
     const filePath = typeof rec.filePath === 'string' ? rec.filePath : '';
-    const parts = filePath.split(/[\\/]/).filter(Boolean); // handles both / and \
+    const parts = filePath.split(/[/\\]/).filter(Boolean);
     return parts[0] || 'local-project';
 }
 
-function toLocalSqlDate(dateInput) {
-    const d = dateInput ? new Date(dateInput) : new Date();
-    if (isNaN(d.getTime())) return new Date().toISOString().slice(0, 19).replace('T', ' ');
-    const pad = (n) => String(n).padStart(2, '0');
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
-}
+// ── controllers ───────────────────────────────────────────────────────────────
 
-function ingestActivity(req, res) {
-    console.log("📩 Telemetry request received");
-    console.log(req.body);
+async function ingestActivity(req, res) {
+    console.log('📩 Telemetry request received');
     try {
         const payload = req.body || {};
-        const userId = ensureUserExists(resolveUserId(req, payload));
-        const events = Array.isArray(payload.events) ? payload.events : [];
-        const batchTimestamp = toLocalSqlDate(payload.timestamp);
+        let userId = resolveUserId(req, payload);
+        if (!userId) userId = await ensureTelemetryUser();
+        else userId = await ensureUserExists(userId);
 
-        if (!Array.isArray(events) || events.length === 0)
+        const events = Array.isArray(payload.events) ? payload.events : [];
+        if (events.length === 0)
             return res.status(200).json({ status: 'ok', inserted: 0 });
 
-        db.prepare("UPDATE users SET last_seen = datetime('now') WHERE id = ?").run(userId);
+        const batchTimestamp = payload.timestamp ? new Date(payload.timestamp) : new Date();
 
-        const insert = db.prepare(`
-            INSERT INTO telemetry (
-                user_id, file_path, file_name, language_id,
-                project_name, project_framework, git_branch, git_repo,
-                active_seconds, lines_added, lines_deleted, lines_modified,
-                raw_code_changes, last_commit_hash, last_commit_message, last_commit_timestamp, last_commit_status, recorded_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `);
+        await User.update({ last_seen: new Date() }, { where: { id: userId } });
 
-        const insertMany = db.transaction((evts) => {
-            for (const rec of evts) {
+        // Process events in a transaction
+        await sequelize.transaction(async (t) => {
+            for (const rec of events) {
                 const projectName = resolveProjectName(rec);
-                const hasRemote = !!(rec.gitRepo && rec.gitRepo !== 'local');
+                const hasRemote   = !!(rec.gitRepo && rec.gitRepo !== 'local');
 
+                // Handle committed events — update uncommitted telemetry & projects
                 if (rec.lastCommitStatus === 'committed') {
-                    db.prepare(`
-                        UPDATE telemetry
-                        SET last_commit_status = 'committed',
-                            last_commit_hash = ?,
-                            last_commit_message = ?,
-                            last_commit_timestamp = ?
-                        WHERE user_id = ?
-                          AND project_name = ?
-                          AND (? = 0 OR git_repo = ?)
-                          AND last_commit_status = 'uncommitted'
-                    `).run(
-                        rec.lastCommitHash || 'none',
-                        rec.lastCommitMessage || '',
-                        rec.lastCommitTimestamp || '',
-                        userId,
-                        projectName,
-                        hasRemote ? 1 : 0,
-                        rec.gitRepo || ''
+                    await Telemetry.update(
+                        {
+                            last_commit_status:    'committed',
+                            last_commit_hash:      rec.lastCommitHash || 'none',
+                            last_commit_message:   rec.lastCommitMessage || '',
+                            last_commit_timestamp: rec.lastCommitTimestamp || '',
+                        },
+                        {
+                            where: {
+                                user_id:           userId,
+                                project_name:      projectName,
+                                last_commit_status: 'uncommitted',
+                                ...(hasRemote ? { git_repo: rec.gitRepo } : {}),
+                            },
+                            transaction: t,
+                        }
                     );
 
-                    db.prepare(`
-                        UPDATE projects
-                        SET last_commit_status = 'committed',
-                            last_commit_hash = ?,
-                            last_commit_message = ?,
-                            last_commit_timestamp = ?
-                        WHERE user_id = ?
-                          AND (repo_name = ? OR name = ?)
-                          AND last_commit_status = 'uncommitted'
-                    `).run(
-                        rec.lastCommitHash || 'none',
-                        rec.lastCommitMessage || '',
-                        rec.lastCommitTimestamp || '',
-                        userId,
-                        projectName,
-                        projectName
+                    await Project.update(
+                        {
+                            last_commit_status:    'committed',
+                            last_commit_hash:      rec.lastCommitHash || 'none',
+                            last_commit_message:   rec.lastCommitMessage || '',
+                            last_commit_timestamp: rec.lastCommitTimestamp || '',
+                        },
+                        {
+                            where: {
+                                user_id:            userId,
+                                last_commit_status: 'uncommitted',
+                                [Op.or]: [
+                                    { repo_name: projectName },
+                                    { name:      projectName },
+                                ],
+                            },
+                            transaction: t,
+                        }
                     );
 
-                    if (rec.lastCommitHash && !['none', 'uncommitted', 'unknown'].includes(rec.lastCommitHash)) {
+                    if (
+                        rec.lastCommitHash &&
+                        !['none', 'uncommitted', 'unknown'].includes(rec.lastCommitHash)
+                    ) {
                         try {
-                            db.prepare(`
-                                INSERT OR IGNORE INTO commits (user_id, project_name, git_branch, git_repo, commit_hash, commit_message, committed_at)
-                                VALUES (?, ?, ?, ?, ?, ?, ?)
-                            `).run(
-                                userId,
-                                projectName,
-                                rec.gitBranch || 'main',
-                                rec.gitRepo || 'local',
-                                rec.lastCommitHash,
-                                rec.lastCommitMessage || '',
-                                rec.lastCommitTimestamp || batchTimestamp
-                            );
-                        } catch (e) {}
+                            await Commit.findOrCreate({
+                                where: {
+                                    user_id:      userId,
+                                    project_name: projectName,
+                                    commit_hash:  rec.lastCommitHash,
+                                },
+                                defaults: {
+                                    git_branch:    rec.gitBranch || 'main',
+                                    git_repo:      rec.gitRepo   || 'local',
+                                    commit_message: rec.lastCommitMessage || '',
+                                    committed_at:  rec.lastCommitTimestamp
+                                        ? new Date(rec.lastCommitTimestamp)
+                                        : batchTimestamp,
+                                },
+                                transaction: t,
+                            });
+                        } catch (_) {}
                     }
                 }
 
-                const activeSecs   = Number(rec.activeSeconds ?? rec.active_seconds) || 0;
-                const linesAdded   = Number(rec.linesAdded ?? rec.lines_added) || 0;
-                const linesDeleted = Number(rec.linesDeleted ?? rec.lines_deleted) || 0;
-                const linesModified = Number(rec.linesModified ?? rec.lines_modified) || 0;
+                const activeSecs    = Number(rec.activeSeconds   ?? rec.active_seconds)   || 0;
+                const linesAdded    = Number(rec.linesAdded      ?? rec.lines_added)       || 0;
+                const linesDeleted  = Number(rec.linesDeleted    ?? rec.lines_deleted)     || 0;
+                const linesModified = Number(rec.linesModified   ?? rec.lines_modified)    || 0;
 
-                // Skip rows with zero active seconds to prevent storing 0-second heartbeat entries
-                if (activeSecs === 0) {
-                    continue;
-                }
+                // Skip zero-second heartbeats (privacy + storage optimization)
+                if (activeSecs === 0) continue;
 
-                // Privacy protection: Sanitize raw code changes — exclude typed text (content)
+                // Sanitize raw code changes — strip typed content for privacy
                 const rawChanges = Array.isArray(rec.rawCodeChanges) ? rec.rawCodeChanges : [];
                 const sanitizedChanges = rawChanges.map(change => ({
                     timeStamp: change.timeStamp || Date.now(),
-                    type: change.type || 'modify',
-                    line: change.line || 1,
-                    amount: change.amount || 0
+                    type:      change.type || 'modify',
+                    line:      change.line || 1,
+                    amount:    change.amount || 0,
                 }));
 
-                insert.run(
-                    userId,
-                    rec.filePath || '',
-                    rec.fileName || '',
-                    rec.languageId || 'unknown',
-                    projectName,
-                    rec.projectFramework || 'none',
-                    rec.gitBranch || 'none',
-                    rec.gitRepo || 'local',
-                    activeSecs,
-                    linesAdded,
-                    linesDeleted,
-                    linesModified,
-                    JSON.stringify(sanitizedChanges),
-                    rec.lastCommitHash || 'none',
-                    rec.lastCommitMessage || '',
-                    rec.lastCommitTimestamp || '',
-                    rec.lastCommitStatus || 'unknown',
-                    batchTimestamp
+                await Telemetry.create(
+                    {
+                        user_id:               userId,
+                        file_path:             rec.filePath  || '',
+                        file_name:             rec.fileName  || '',
+                        language_id:           rec.languageId           || 'unknown',
+                        project_name:          projectName,
+                        project_framework:     rec.projectFramework     || 'none',
+                        git_branch:            rec.gitBranch            || 'none',
+                        git_repo:              rec.gitRepo              || 'local',
+                        active_seconds:        activeSecs,
+                        lines_added:           linesAdded,
+                        lines_deleted:         linesDeleted,
+                        lines_modified:        linesModified,
+                        raw_code_changes:      JSON.stringify(sanitizedChanges),
+                        last_commit_hash:      rec.lastCommitHash       || 'none',
+                        last_commit_message:   rec.lastCommitMessage    || '',
+                        last_commit_timestamp: rec.lastCommitTimestamp  || '',
+                        last_commit_status:    rec.lastCommitStatus     || 'unknown',
+                        recorded_at:           batchTimestamp,
+                    },
+                    { transaction: t }
                 );
             }
         });
 
-        insertMany(events);
-        upsertProjects(userId, events, batchTimestamp);
+        await upsertProjects(userId, events, batchTimestamp);
         try { notifyTelemetryUpdate(userId); } catch (e) { console.error('[ws] notification failed:', e); }
 
         return res.status(200).json({ status: 'success', inserted: events.length });
@@ -187,53 +178,66 @@ function ingestActivity(req, res) {
     }
 }
 
-function upsertProjects(userId, events, timestamp) {
+async function upsertProjects(userId, events, timestamp) {
     const seen = new Set();
-
     for (const rec of events) {
         const projectName = resolveProjectName(rec);
         if (seen.has(projectName)) continue;
         seen.add(projectName);
 
-        const existing = db.prepare(
-            'SELECT id FROM projects WHERE user_id = ? AND repo_name = ?'
-        ).get(userId, projectName);
+        const existing = await Project.findOne({
+            where: { user_id: userId, repo_name: projectName },
+        });
 
         if (existing) {
-            db.prepare(`
-                UPDATE projects
-                SET last_seen = ?, status = 'in_progress', last_commit_hash = ?, last_commit_message = ?, last_commit_timestamp = ?, last_commit_status = ?
-                WHERE id = ?
-            `).run(timestamp, rec.lastCommitHash || 'none', rec.lastCommitMessage || '', rec.lastCommitTimestamp || '', rec.lastCommitStatus || 'unknown', existing.id);
+            await existing.update({
+                last_seen:             timestamp,
+                status:                'in_progress',
+                last_commit_hash:      rec.lastCommitHash      || 'none',
+                last_commit_message:   rec.lastCommitMessage   || '',
+                last_commit_timestamp: rec.lastCommitTimestamp || '',
+                last_commit_status:    rec.lastCommitStatus    || 'unknown',
+            });
         } else {
-            db.prepare(`
-                INSERT INTO projects (user_id, name, repo_name, framework, first_seen, last_seen, last_commit_hash, last_commit_message, last_commit_timestamp, last_commit_status)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            `).run(userId, projectName, projectName, rec.projectFramework || 'none', timestamp, timestamp, rec.lastCommitHash || 'none', rec.lastCommitMessage || '', rec.lastCommitTimestamp || '', rec.lastCommitStatus || 'unknown');
+            await Project.create({
+                user_id:               userId,
+                name:                  projectName,
+                repo_name:             projectName,
+                framework:             rec.projectFramework || 'none',
+                first_seen:            timestamp,
+                last_seen:             timestamp,
+                last_commit_hash:      rec.lastCommitHash      || 'none',
+                last_commit_message:   rec.lastCommitMessage   || '',
+                last_commit_timestamp: rec.lastCommitTimestamp || '',
+                last_commit_status:    rec.lastCommitStatus    || 'unknown',
+            });
         }
     }
 }
 
-function getSummary(req, res) {
+async function getSummary(req, res) {
     const userId = req.user.id;
-    const to = req.query.to || new Date().toISOString();
-    const from = req.query.from || new Date(Date.now() - 86400000).toISOString();
+    const to   = req.query.to   ? new Date(req.query.to)   : new Date();
+    const from = req.query.from ? new Date(req.query.from) : new Date(Date.now() - 86400000);
 
-    const rows = db.prepare(`
+    const rows = await sequelize.query(`
         SELECT
             project_name,
             language_id,
             git_branch,
-            SUM(active_seconds) AS total_seconds,
-            SUM(lines_added)    AS total_added,
-            SUM(lines_deleted)  AS total_deleted,
-            SUM(lines_modified) AS total_modified,
-            COUNT(*)            AS sessions
+            SUM(active_seconds)  AS total_seconds,
+            SUM(lines_added)     AS total_added,
+            SUM(lines_deleted)   AS total_deleted,
+            SUM(lines_modified)  AS total_modified,
+            COUNT(*)             AS sessions
         FROM telemetry
-        WHERE user_id = ? AND recorded_at BETWEEN ? AND ?
+        WHERE user_id = :userId AND recorded_at BETWEEN :from AND :to
         GROUP BY project_name, language_id, git_branch
         ORDER BY total_seconds DESC
-    `).all(userId, from, to);
+    `, {
+        replacements: { userId, from, to },
+        type: QueryTypes.SELECT,
+    });
 
     return res.json({ from, to, summary: rows });
 }
